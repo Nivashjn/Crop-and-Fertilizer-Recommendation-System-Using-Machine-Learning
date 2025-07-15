@@ -1,0 +1,243 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from PIL import Image
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+from sklearn.ensemble import RandomForestClassifier
+
+# Streamlit app configuration
+st.set_page_config(page_title="Crop and Fertilizer Recommendation using Machine Learning", layout="wide")
+
+# Load the datasets
+fertilizer_data = pd.read_csv("Fertilizer Prediction.csv")
+crop_data = pd.read_csv("Crop_recommendation.csv")
+
+# Sidebar Navigation
+menu = ["Home", "Crop Recommendation", "Fertilizer Suggestion"]
+choice = st.sidebar.selectbox("Menu", menu)
+
+# ==================== 🏡 Home Page ====================
+if choice == "Home":
+    st.title("🌾 Crop and Fertilizer Recommendation using Machine Learning")
+    st.header("Welcome to Smart Farming Assistance")
+
+    st.write("""
+    This application uses **machine learning** to assist farmers in making data-driven decisions 
+    for **crop selection** and **fertilizer recommendations**. By analyzing **soil nutrients**, 
+    **climate conditions**, and **rainfall data**, it provides **optimal suggestions** to improve yield.
+    """)
+
+    st.subheader("🚀 How It Works:")
+    st.markdown("""
+    - 📊 **Crop Recommendation**: Suggests the best crop based on soil and climate conditions.
+    - 🌱 **Fertilizer Suggestion**: Provides optimal fertilizer recommendations to improve yield.
+    - 🔍 **Data-Driven Insights**: Uses **AI models** trained on soil properties and climate data.
+    - 📈 **Increased Productivity**: Helps farmers make informed choices, leading to better yield.
+    """)
+
+    st.subheader("📌 How to Use This Application:")
+    st.markdown("""
+    1. **Navigate using the Sidebar**: Choose between "Crop Recommendation" and "Fertilizer Suggestion".
+    2. **Crop Recommendation**:
+        - Select your **State & District** to get rainfall data.
+        - Enter **Soil Nutrient Levels & pH** to get the best crop recommendation.
+    3. **Fertilizer Suggestion**:
+        - Enter temperature, humidity, and soil nutrient levels.
+        - Select **Soil Type & Crop Type** to get the best fertilizer suggestion.
+    4. **View Insights**: Visual charts and AI-generated recommendations will guide your decision-making.
+    """)
+
+    st.success("🔹 Start exploring the features using the **sidebar menu**!") 
+
+# ==================== 🌱 Crop Recommendation ====================
+elif choice == "Crop Recommendation":
+    st.title("🌱 Crop Recommendation System")
+    st.write("Enter soil and climate details to get the best crop suggestions.")
+
+    # Load rainfall dataset
+    rainfall_data = pd.read_csv("rainfall.csv")
+    rainfall_data.rename(columns={"STATE_UT_NAME": "State", "DISTRICT": "District"}, inplace=True)
+    # User selects location and month
+    st.subheader("📍 Select Location & Month")
+    states = rainfall_data["State"].unique()
+    selected_state = st.selectbox("Select State", states)
+
+    districts = rainfall_data[rainfall_data["State"] == selected_state]["District"].unique()
+    selected_district = st.selectbox("Select District", districts)
+
+    months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+    selected_month = st.selectbox("Select Month", months)
+
+    filtered_data = rainfall_data[
+        (rainfall_data["State"] == selected_state) & 
+        (rainfall_data["District"] == selected_district)
+    ]
+
+    if not filtered_data.empty:
+        rainfall_value = filtered_data[selected_month].values[0]
+        st.info(f"🌧️ Average Rainfall for {selected_district}, {selected_state} in {selected_month}: **{rainfall_value} mm**")
+    else:
+        rainfall_value = 0
+        st.warning("⚠️ No rainfall data available for the selected location and month.")
+
+    # Plot Rainfall Trends
+    if not filtered_data.empty:
+        monthly_rainfall = filtered_data[months].values.flatten()
+        st.info(f"🌧️ Annual Rainfall: {np.sum(monthly_rainfall):.2f} mm")
+        
+        fig, ax = plt.subplots(figsize=(7, 3))  
+        sns.barplot(x=months, y=monthly_rainfall, palette="Blues")
+
+        ax.set_title(f"📊 Monthly Rainfall in {selected_district}, {selected_state}", fontsize=13, fontweight="bold", color="#8E44AD")
+        ax.set_ylabel("Rainfall (mm)", fontsize=11, fontweight="bold", color="#34495E")
+        ax.set_xlabel("Months", fontsize=11, fontweight="bold", color="#34495E")
+
+        plt.xticks(rotation=45)
+        st.pyplot(fig)
+
+    # User input for soil parameters
+    nitrogen = st.number_input("Nitrogen Level", min_value=0, max_value=100, value=0)
+    phosphorus = st.number_input("Phosphorus Level", min_value=0, max_value=100, value=0)
+    potassium = st.number_input("Potassium Level", min_value=0, max_value=100, value=0)
+    pH = st.number_input("Soil pH", min_value=0.0, max_value=14.0, value=0.0)
+    humidity = st.number_input("Humidity (%)", min_value=0, max_value=100, value=0)  # Added humidity input
+
+
+    st.write(f"💧 Using Rainfall: {rainfall_value} mm (from dataset)")
+
+    if st.button("🌱 Recommend Crop"):
+        # Using the Crop Recommendation dataset for predicting the crop
+        crop_condition = crop_data[(crop_data['Nitrogen'] <= nitrogen) & 
+                                   (crop_data['Phosphorous'] <= phosphorus) & 
+                                   (crop_data['Potassium'] <= potassium) & 
+                                   (crop_data['temperature'] >= 20) & 
+                                   (crop_data['humidity'] >= humidity)]
+
+        if len(crop_condition) > 0:
+            recommended_crop = crop_condition['label'].iloc[0]
+            st.success(f"✅ Recommended Crop: {recommended_crop}")
+        else:
+            st.warning("⚠️ No matching crops found. Try adjusting the inputs.")
+
+# ==================== 💧 Fertilizer Suggestion ====================
+# ==================== 💧 Fertilizer Suggestion ====================
+elif choice == "Fertilizer Suggestion":
+    st.title("💧 Fertilizer Suggestion System")
+
+    # Load fertilizer data
+    fertilizer_data = pd.read_csv("Fertilizer Prediction.csv")
+
+    # Dropdown for Soil Type and Crop Type
+    soil_types = fertilizer_data['Soil Type'].unique()
+    crop_types = fertilizer_data['Crop Type'].unique()
+
+    soil_type = st.selectbox("Select Soil Type", soil_types)
+    crop_type = st.selectbox("Select Crop Type", crop_types)
+
+    # Input fields for fertilizer recommendation
+    temperature = st.number_input("Enter Temperature (°C):", min_value=0, max_value=50)
+    humidity = st.number_input("Enter Humidity (%):", min_value=0, max_value=100)
+    moisture = st.number_input("Enter Moisture (%):", min_value=0, max_value=100)
+    nitrogen = st.number_input("Enter Nitrogen (%):", min_value=0.0, max_value=100.0)
+    potassium = st.number_input("Enter Potassium (%):", min_value=0.0, max_value=100.0)
+    phosphorous = st.number_input("Enter Phosphorous (%):", min_value=0.0, max_value=100.0)
+
+    def fertilizer_usage(fertilizer_name):
+        if fertilizer_name == "Urea":
+            return """
+            📌 **How to Use the Recommended Fertilizer:**
+            - 🌱 **Urea** is high in nitrogen and should be applied for crops needing more nitrogen, such as **leafy vegetables** and **cereal crops**.
+            - 🟢 Apply in **moderate quantity** to avoid over-fertilization, especially in **sandy soils**.
+            - 🔄 Use in **phased applications** to avoid nitrogen loss through volatilization.
+            - 💦 Ensure **proper watering** after fertilizer application to enhance nitrogen absorption.
+            """
+        elif fertilizer_name == "DAP":
+            return """
+            📌 **How to Use the Recommended Fertilizer:**
+            - 🌱 **DAP** is rich in phosphorus and should be applied for crops needing strong root development, such as **tobacco**, **pulses**, and **legumes**.
+            - 🟢 Apply in **moderate quantity** to avoid phosphorus runoff, particularly in **loamy** and **clayey soils**.
+            - 🔄 **Phased applications** can help prevent phosphorus fixation in alkaline soils.
+            - 💦 Ensure **proper watering** after application to help phosphorus dissolve and move to the root zone.
+            """
+        elif fertilizer_name == "14-35-14":
+            return """
+            📌 **How to Use the Recommended Fertilizer:**
+            - 🌱 **14-35-14** has higher phosphorus content and should be used for **root crops** or crops needing a boost in **root growth** like **sugarcane** and **cotton**.
+            - 🟢 Apply in **moderate quantity** based on crop and soil needs.
+            - 🔄 Use in **phased applications** to optimize nutrient absorption.
+            - 💦 Ensure **adequate watering** to help the fertilizer reach the roots.
+            """
+        elif fertilizer_name == "17-17-17":
+            return """
+            📌 **How to Use the Recommended Fertilizer:**
+            - 🌱 **17-17-17** is a balanced fertilizer, suitable for a wide range of crops, including **cereal crops**, **vegetables**, and **fruit crops**.
+            - 🟢 Apply in **moderate quantity** based on soil testing results and crop needs.
+            - 🔄 Use in **phased applications** for better nutrient uptake over the growing season.
+            - 💦 Ensure **proper watering** to enhance nutrient absorption by roots.
+            """
+        elif fertilizer_name == "28-28":
+            return """
+            📌 **How to Use the Recommended Fertilizer:**
+            - 🌱 **28-28** is a balanced fertilizer with equal nitrogen and phosphorus content, ideal for **fruit crops** and **vegetables**.
+            - 🟢 Apply in **moderate quantity**, especially in soils with adequate potassium.
+            - 🔄 **Phased applications** can optimize nutrient absorption and prevent nutrient imbalance.
+            - 💦 Ensure **adequate watering** after application to enhance the fertilizer's efficiency.
+            """
+        elif fertilizer_name == "20-20":
+            return """
+            📌 **How to Use the Recommended Fertilizer:**
+            - 🌱 **20-20** is a balanced fertilizer with equal nitrogen and phosphorus content. It's best for crops like **cotton**, **wheat**, and **groundnuts** that need balanced nutrition.
+            - 🟢 Apply in **moderate quantity** to avoid nutrient imbalance in soil.
+            - 🔄 **Phased applications** can provide a continuous supply of nutrients.
+            - 💦 Ensure **proper watering** after fertilizer application to improve nutrient absorption.
+            """
+        elif fertilizer_name == "10-26-26":
+            return """
+            📌 **How to Use the Recommended Fertilizer:**
+            - 🌱 **10-26-26** is high in phosphorus and potassium, making it ideal for **root crops** and crops needing enhanced **root development** like **tobacco** and **pulses**.
+            - 🟢 Apply in **moderate quantity** and follow **soil test recommendations** for optimal use.
+            - 🔄 **Phased applications** help in better nutrient uptake.
+            - 💦 Ensure **adequate watering** for better fertilizer efficiency.
+            """
+        else:
+            return "Please select a valid fertilizer."
+
+    if st.button("Get Fertilizer Recommendation"):
+        # Filter the fertilizer dataset based on user inputs
+        fertilizer_condition = fertilizer_data[
+            (fertilizer_data['Soil Type'] == soil_type) &
+            (fertilizer_data['Crop Type'] == crop_type) &
+            (fertilizer_data['Nitrogen'] <= nitrogen) &
+            (fertilizer_data['Potassium'] <= potassium) &
+            (fertilizer_data['Phosphorous'] <= phosphorous) &
+            (fertilizer_data['Temperature'] <= temperature) &
+            (fertilizer_data['Humidity '] <= humidity)
+        ]
+
+        if len(fertilizer_condition) > 0:
+            recommended_fertilizer = fertilizer_condition['Fertilizer Name'].iloc[0]
+            st.success(f"✅ Recommended Fertilizer: {recommended_fertilizer}")
+
+            # Display fertilizer usage instructions
+            usage_instructions = fertilizer_usage(recommended_fertilizer)
+            st.markdown(usage_instructions)
+        else:
+            st.warning("⚠️ No matching fertilizers found. Try adjusting the inputs.")
+
+
+# ==================== 📢 Sidebar Content ====================
+st.sidebar.markdown("---")  
+st.sidebar.info("💡 **Tip:** Testing soil pH regularly helps in selecting the right crops and fertilizers! 🌱")  
+st.sidebar.warning("📢 **Did You Know?** AI-based recommendations can boost crop yield by 20-30%! 📈")  
+st.sidebar.success("🚀 Data-driven farming is the future! Select an option above to start.")  
+st.sidebar.markdown("---")  
+st.sidebar.subheader("📚 Helpful Resources")
+st.sidebar.markdown("[Soil Health Guide](https://soilhealth.dac.gov.in/home)")
+st.sidebar.markdown("[Farming Best Practices](https://tnau.ac.in/)") 
+st.sidebar.markdown("---")  
+st.sidebar.write("🔄 **App Version:** 1.0.0")  
+st.sidebar.write("🆕 **Last Updated:** April 2025")  
+
